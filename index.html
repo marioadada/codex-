@@ -1,0 +1,941 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<title>思维碎片</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #1a1a2e; --surface: #16213e; --card: #0f3460;
+  --accent: #e94560; --text: #eee; --text2: #aaa;
+  --tag-emotion: #ff6b6b; --tag-work: #4ecdc4; --tag-read: #ffe66d;
+  --tag-habit: #a29bfe; --tag-decision: #fd79a8;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg); color: var(--text); height: 100vh;
+  display: flex; flex-direction: column; max-width: 600px; margin: 0 auto;
+}
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; background: var(--surface); border-bottom: 1px solid #ffffff15;
+  -webkit-app-region: drag;
+}
+header h1 { font-size: 18px; font-weight: 600; }
+header h1 span { color: var(--accent); }
+.header-actions { display: flex; gap: 8px; }
+.header-actions button {
+  background: none; border: none; color: var(--text2); font-size: 20px;
+  cursor: pointer; padding: 4px 8px; border-radius: 8px;
+  -webkit-app-region: no-drag;
+}
+.header-actions button:hover { background: #ffffff10; }
+#chat {
+  flex: 1; overflow-y: auto; padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+  scroll-behavior: smooth;
+}
+.msg { max-width: 92%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.6; word-break: break-word; }
+.msg.user { background: var(--card); align-self: flex-end; border-bottom-right-radius: 4px; }
+.msg.bot { background: var(--surface); align-self: flex-start; border-bottom-left-radius: 4px; }
+.msg.time { background: #0d4a3e; align-self: flex-start; border-bottom-left-radius: 4px; }
+.msg.system { background: transparent; align-self: center; font-size: 12px; color: var(--text2); padding: 4px; }
+.msg .label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+.msg .time-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-right: 4px; }
+.tag-emotion { background: var(--tag-emotion); color: #000; }
+.tag-work { background: var(--tag-work); color: #000; }
+.tag-read { background: var(--tag-read); color: #000; }
+.tag-habit { background: var(--tag-habit); color: #000; }
+.tag-decision { background: var(--tag-decision); color: #000; }
+.input-area {
+  padding: 8px 12px 12px; background: var(--surface);
+  border-top: 1px solid #ffffff15;
+}
+.input-row { display: flex; gap: 8px; }
+.input-row textarea {
+  flex: 1; background: var(--bg); border: 1px solid #ffffff20; border-radius: 12px;
+  padding: 10px 14px; color: var(--text); font-size: 14px; resize: none;
+  min-height: 44px; max-height: 120px; font-family: inherit; outline: none;
+}
+.input-row textarea:focus { border-color: var(--accent); }
+.btn-send {
+  width: 44px; height: 44px; border-radius: 50%; border: none;
+  background: var(--accent); color: white; font-size: 18px; cursor: pointer;
+  flex-shrink: 0; transition: .2s;
+}
+.btn-send:active { transform: scale(.92); }
+.quick-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.quick-actions button {
+  padding: 5px 12px; border-radius: 16px; border: 1px solid #ffffff20;
+  background: transparent; color: var(--text2); font-size: 12px; cursor: pointer; transition: .2s;
+}
+.quick-actions button:hover, .quick-actions button:active { background: #ffffff10; color: var(--text); border-color: var(--accent); }
+.loading { display: flex; align-items: center; gap: 6px; padding: 8px 0; }
+.loading .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text2); animation: bounce 1.2s infinite; }
+.loading .dot:nth-child(2) { animation-delay: .2s; }
+.loading .dot:nth-child(3) { animation-delay: .4s; }
+@keyframes bounce { 0%,80%,100% { transform: translateY(0); } 40% { transform: translateY(-6px); } }
+
+/* Settings Modal */
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,.6); z-index: 100; align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--surface); border-radius: 16px; padding: 24px;
+  width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto;
+}
+.modal h2 { font-size: 18px; margin-bottom: 16px; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 4px; }
+.form-group select, .form-group input {
+  width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #ffffff20;
+  background: var(--bg); color: var(--text); font-size: 14px; outline: none; font-family: inherit;
+}
+.form-group select:focus, .form-group input:focus { border-color: var(--accent); }
+.modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+.modal-actions button {
+  flex: 1; padding: 10px; border-radius: 10px; border: none; font-size: 14px; cursor: pointer;
+}
+.btn-primary { background: var(--accent); color: white; }
+.btn-secondary { background: #ffffff10; color: var(--text); }
+.status-indicator { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.status-dot.online { background: #2ecc71; }
+.status-dot.offline { background: #e74c3c; }
+.empty-state { text-align: center; padding: 40px 20px; color: var(--text2); font-size: 14px; line-height: 2; }
+.empty-state .emoji { font-size: 48px; margin-bottom: 12px; }
+
+/* Stats in time records */
+.stats-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.stat-item { background: #ffffff08; padding: 4px 10px; border-radius: 8px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>🧩</span> 思维碎片</h1>
+  <div class="header-actions">
+    <span class="status-indicator" id="statusIndicator"><span class="status-dot offline" id="statusDot"></span><span id="statusLabel">未配置</span></span>
+    <button onclick="openSettings()" title="设置">⚙️</button>
+  </div>
+</header>
+
+<div id="chat">
+  <div class="msg system" id="welcomeMsg">
+    <div class="empty-state">
+      <div class="emoji">🧩</div>
+      <div>发碎碎念给我<br>或粘贴时间记录 <code>0130-0800 睡觉</code><br><br>支持：千问 / 豆包 / DeepSeek</div>
+    </div>
+  </div>
+</div>
+
+<div class="input-area">
+  <div class="input-row">
+    <textarea id="input" rows="1" placeholder="碎碎念 / 时间记录 / 今天总结 / 周复盘 ..." enterkeyhint="send"></textarea>
+    <button class="btn-send" id="sendBtn" onclick="sendMessage()">➤</button>
+  </div>
+  <div class="quick-actions">
+    <button onclick="quickAction('今天总结')">📅 今天总结</button>
+    <button onclick="quickAction('周复盘')">📊 周复盘</button>
+    <button onclick="quickAction('月复盘')">📈 月复盘</button>
+    <button onclick="viewHistory()">📋 历史</button>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>⚙️ 设置</h2>
+    <div class="form-group">
+      <label>AI 模型</label>
+      <select id="apiProvider" onchange="updateEndpoint()">
+        <option value="qwen">千问 (通义千问)</option>
+        <option value="doubao">豆包</option>
+        <option value="deepseek">DeepSeek</option>
+        <option value="custom">自定义</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>模型名称</label>
+      <input id="modelName" placeholder="如 qwen-max / deepseek-chat">
+    </div>
+    <div class="form-group">
+      <label>API Endpoint</label>
+      <input id="apiEndpoint" placeholder="https://api.deepseek.com/v1">
+    </div>
+    <div class="form-group">
+      <label>API Key</label>
+      <input id="apiKey" type="password" placeholder="sk-...">
+    </div>
+    <div class="form-group">
+      <label>系统提示词（可选，默认使用内置优化版）</label>
+      <textarea id="systemPrompt" rows="3" style="width:100%;padding:10px;border-radius:10px;border:1px solid #ffffff20;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;resize:vertical;outline:none;" placeholder="留空使用内置提示词"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="saveSettings()">保存</button>
+      <button class="btn-secondary" onclick="closeSettings()">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== IndexedDB ====================
+const DB_NAME = 'fragment-tracker-v1';
+const DB_VERSION = 1;
+let db = null;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('fragments')) {
+        const store = d.createObjectStore('fragments', { keyPath: 'id', autoIncrement: true });
+        store.createIndex('date', 'date', { unique: false });
+        store.createIndex('type', 'type', { unique: false });
+      }
+      if (!d.objectStoreNames.contains('settings')) {
+        d.createObjectStore('settings', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = (e) => { db = e.target.result; resolve(db); };
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function dbAdd(store, data) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).add(data);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function dbGetAll(store, indexName, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    let req;
+    if (indexName && value) {
+      req = tx.objectStore(store).index(indexName).getAll(value);
+    } else {
+      req = tx.objectStore(store).getAll();
+    }
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function dbPut(store, data) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).put(data);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function dbGet(store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function getSettings() {
+  const s = await dbGet('settings', 'api_config');
+  return s ? s.value : { provider: '', model: '', endpoint: '', key: '', systemPrompt: '' };
+}
+
+async function saveSettingsToDB(data) {
+  await dbPut('settings', { key: 'api_config', value: data });
+}
+
+// ==================== Providers ====================
+const PROVIDERS = {
+  qwen: { endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-max' },
+  doubao: { endpoint: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-pro-32k' },
+  deepseek: { endpoint: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+  custom: { endpoint: '', model: '' }
+};
+
+function updateEndpoint() {
+  const p = document.getElementById('apiProvider').value;
+  if (p !== 'custom') {
+    document.getElementById('apiEndpoint').value = PROVIDERS[p].endpoint;
+    document.getElementById('modelName').value = PROVIDERS[p].model;
+  }
+}
+
+// ==================== UI Helpers ====================
+function addMessage(content, type = 'bot') {
+  const chat = document.getElementById('chat');
+  const div = document.createElement('div');
+  div.className = 'msg ' + type;
+  if (type === 'bot' || type === 'time') {
+    div.innerHTML = content;
+  } else if (type === 'user') {
+    div.textContent = content;
+  }
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+function removeWelcome() {
+  const w = document.getElementById('welcomeMsg');
+  if (w) w.remove();
+}
+
+function showLoading() {
+  const chat = document.getElementById('chat');
+  const div = document.createElement('div');
+  div.className = 'msg bot loading';
+  div.id = 'loadingIndicator';
+  div.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function hideLoading() {
+  const el = document.getElementById('loadingIndicator');
+  if (el) el.remove();
+}
+
+function updateStatus(configured) {
+  const dot = document.getElementById('statusDot');
+  const label = document.getElementById('statusLabel');
+  if (configured) {
+    dot.className = 'status-dot online';
+    label.textContent = '已配置';
+  } else {
+    dot.className = 'status-dot offline';
+    label.textContent = '未配置';
+  }
+}
+
+// ==================== Input Classification ====================
+// Time pattern: "0130-0800 睡觉" or "01:30-08:00 睡觉"
+const TIME_PATTERN = /^(\d{1,2}[:：]?\d{2})\s*[-—～]\s*(\d{1,2}[:：]?\d{2})\s+(.+)$/;
+
+// Command patterns
+const SUMMARY_CMD = /^(今天总结|日总结|今天汇总|daily)$/i;
+const WEEKLY_CMD = /^(周复盘|这周总结|weekly)$/i;
+const MONTHLY_CMD = /^(月复盘|本月总结|monthly)$/i;
+const HISTORY_CMD = /^(历史|history|查看)$/i;
+
+function classifyInput(text) {
+  text = text.trim();
+  if (!text) return null;
+
+  // Check commands first
+  if (SUMMARY_CMD.test(text)) return { type: 'command_summary' };
+  if (WEEKLY_CMD.test(text)) return { type: 'command_weekly' };
+  if (MONTHLY_CMD.test(text)) return { type: 'command_monthly' };
+  if (HISTORY_CMD.test(text)) return { type: 'command_history' };
+
+  // Check time pattern
+  const tm = text.match(TIME_PATTERN);
+  if (tm) {
+    return { type: 'time_log', start: tm[1], end: tm[2], activity: tm[3] };
+  }
+
+  // Check length
+  const len = text.length;
+  if (len < 30) return { type: 'micro', length: len };
+  if (len < 100) return { type: 'medium', length: len };
+  return { type: 'long', length: len };
+}
+
+// ==================== Time Parsing ====================
+function parseTime(t) {
+  t = t.replace('：', ':');
+  const parts = t.split(':');
+  if (parts.length === 2) {
+    return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+  }
+  // HHMM format like 0130
+  if (t.length === 4) {
+    return parseInt(t.substring(0, 2)) * 60 + parseInt(t.substring(2, 4));
+  }
+  return 0;
+}
+
+function calcDuration(start, end) {
+  let s = parseTime(start);
+  let e = parseTime(end);
+  if (e < s) e += 1440; // cross midnight
+  return e - s;
+}
+
+function formatDuration(min) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h > 0 ? `${h}h${m > 0 ? m + 'm' : ''}` : `${m}m`;
+}
+
+function categorizeActivity(activity) {
+  const map = {
+    '睡觉': ['睡', '觉', '眠', '午休', 'nap'],
+    '睡眠': ['睡', '觉', '眠', '午休'],
+    '生活': ['洗漱', '买菜', '做饭', '吃饭', '洗', '打扫', '收拾', '穿衣', '洗澡', '护肤', '洗衣', '碗', '菜', '包子', '鸡蛋', '西红柿', '卤料'],
+    '运动': ['八段锦', '跑步', '锻炼', '健身', '瑜伽', '跳绳', '打球', '台球', '乒乓球', '散步', '走'],
+    '工作学习': ['学习', '研究', '看书', '读', '代码', '写', '方案', '会议', '工作', '课', '安克', '教程', 'codex', 'code'],
+    '娱乐': ['刷剧', '摸鱼', '看盘', 'wb', '微博', '抖音', '小红书', '视频', '剧', '电影', '综艺'],
+    '社交': ['约会', '聊天', '朋友', '聚会', '电话', '台球', '乒乓球', '夜宵'],
+    '通勤': ['开车', '地铁', '公交', '路上', '骑车', '通勤'],
+  };
+
+  const lower = activity.toLowerCase();
+  // More specific first
+  if (/睡|午休|nap/i.test(lower)) return '睡眠';
+  if (/八段锦|跑步|锻炼|健身|瑜伽|跳绳|打球|台球|乒乓球|散步/i.test(lower)) return '运动';
+  if (/学习|研究|看书|读|代码|写.*方案|会议|课|教程/i.test(lower)) return '工作学习';
+  if (/约会|台球|乒乓球|夜宵|朋友|聚会/i.test(lower)) return '社交';
+  if (/刷剧|摸鱼|看盘|wb|微博|抖音|小红书|视频|剧|电影|综艺/i.test(lower)) return '娱乐';
+  if (/洗漱|买菜|做饭|吃饭|洗.*地|打扫|收拾|穿衣|洗澡|护肤|洗衣|碗|菜|包子|鸡蛋|西红柿|卤料/i.test(lower)) return '生活';
+  if (/开车|地铁|公交|通勤|骑车/i.test(lower)) return '通勤';
+  return '其他';
+}
+
+// ==================== Mood/Type Detection ====================
+const MOOD_KEYWORDS = {
+  '焦虑': ['焦虑', '紧张', '担心', '害怕', '慌', '不安', '压力', '烦躁'],
+  '愤怒': ['生气', '愤怒', '烦', '火大', '无语', '气', '不满', '抱怨'],
+  '悲伤': ['难过', '伤心', '失落', '沮丧', '低落', '哭', '委屈', '孤独'],
+  '疲惫': ['累', '疲惫', '困', '没劲', '虚', '乏力', '疲劳', '瘫'],
+  '愉悦': ['开心', '高兴', '快乐', '爽', '满足', '幸福', '开心', '舒服'],
+  '困惑': ['迷茫', '困惑', '不懂', '不确定', '犹豫', '纠结', '不知道', '怎么办']
+};
+
+const TYPE_KEYWORDS = {
+  '情绪': ['烦', '生气', '难过', '委屈', '无语', '焦虑', '压力', '累', '开心', '气死'],
+  '工作': ['工作', '任务', '项目', '老板', '同事', '客户', '效率', '拖延', 'deadline', '开会'],
+  '读书': ['书', '读', '观点', '文章', '学', '知识', '理论', '概念'],
+  '习惯': ['想', '打算', '计划', '开始', '坚持', '戒', '改', '目标', '习惯'],
+  '决策': ['选择', '犹豫', '纠结', '要不要', '还是', '哪个', '决定', '取舍'],
+};
+
+function detectType(text) {
+  for (const [type, keywords] of Object.entries(TYPE_KEYWORDS)) {
+    for (const kw of keywords) {
+      if (text.includes(kw)) return type;
+    }
+  }
+  return '其他';
+}
+
+function detectMood(text) {
+  for (const [mood, keywords] of Object.entries(MOOD_KEYWORDS)) {
+    for (const kw of keywords) {
+      if (text.includes(kw)) return mood;
+    }
+  }
+  return null;
+}
+
+// ==================== AI API Call ====================
+const SYSTEM_PROMPT_DEFAULT = `你是"成长合伙人"——帮助用户从碎片化思维中提取洞察、识别限制性信念、生成可执行行动项。
+
+回复规则：
+1. 原文必须一字不差保留
+2. 不做情绪按摩，做结构性拆解
+3. 每条洞察一句话，不长篇大论
+4. 行动项必须动词开头、可执行、有时限
+5. 语气：让人感到"被看见了但不被惯着"
+
+输出结构：
+
+## 📌 核心洞察（2-4条）
+- 原文背后没说出来的东西
+
+## 🔍 信念扫描
+| 信念 | 方向 |
+|------|------|
+| ... | ✅/⚡/❌/❓ |
+
+方向：✅正向保留 ⚡需审视 ❌限制性 ❓未验证
+
+## 🎯 行动项
+- 🎯 核心一击：[动词+对象+最小单位]
+- ⚡ 重要：[1-2条]
+
+如果是日总结或周复盘，调整格式为汇总报告形式。`;
+
+async function callAI(messages) {
+  const settings = await getSettings();
+  if (!settings.key) {
+    throw new Error('请先在设置中配置 API Key');
+  }
+  const sysPrompt = settings.systemPrompt || SYSTEM_PROMPT_DEFAULT;
+  
+  const body = {
+    model: settings.model || 'deepseek-chat',
+    messages: [
+      { role: 'system', content: sysPrompt },
+      ...messages
+    ],
+    temperature: 0.7,
+    max_tokens: 2000,
+    stream: false
+  };
+
+  const res = await fetch(settings.endpoint + '/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + settings.key
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error('API 错误: ' + res.status + ' ' + err.substring(0, 200));
+  }
+
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
+// ==================== Data Operations ====================
+function today() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function now() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+async function getTodayFragments() {
+  const all = await dbGetAll('fragments', 'date', today());
+  return all;
+}
+
+async function getWeekFragments() {
+  const d = new Date();
+  const dayOfWeek = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+  const monStr = monday.toISOString().split('T')[0];
+  const all = await dbGetAll('fragments');
+  return all.filter(f => f.date >= monStr && f.date <= today());
+}
+
+async function getMonthFragments() {
+  const d = new Date();
+  const firstDay = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-01';
+  const all = await dbGetAll('fragments');
+  return all.filter(f => f.date >= firstDay && f.date <= today());
+}
+
+// ==================== Process Message ====================
+async function sendMessage() {
+  const input = document.getElementById('input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  input.style.height = 'auto';
+  
+  removeWelcome();
+  addMessage(text, 'user');
+  
+  const classification = classifyInput(text);
+  
+  try {
+    switch (classification.type) {
+      case 'time_log':
+        await processTimeLog(text, classification);
+        break;
+      case 'micro':
+        await processMicro(text);
+        break;
+      case 'medium':
+        await processMedium(text);
+        break;
+      case 'long':
+        await processLong(text);
+        break;
+      case 'command_summary':
+        await processDailySummary();
+        break;
+      case 'command_weekly':
+        await processWeeklyReview();
+        break;
+      case 'command_monthly':
+        await processMonthlyReview();
+        break;
+      case 'command_history':
+        await showHistory();
+        break;
+      default:
+        addMessage('📝 已记录 ✅', 'bot');
+        await dbAdd('fragments', { date: today(), time: now(), text, type: 'fragment' });
+    }
+  } catch (err) {
+    hideLoading();
+    addMessage('⚠️ ' + err.message, 'bot');
+  }
+}
+
+// ==================== Processors ====================
+async function processTimeLog(text, cls) {
+  const dur = calcDuration(cls.start, cls.end);
+  const cat = categorizeActivity(cls.activity);
+  const durStr = formatDuration(dur);
+  
+  await dbAdd('fragments', {
+    date: today(), time: now(), text, type: 'time_log',
+    timeData: { start: cls.start, end: cls.end, activity: cls.activity, duration_min: dur, category: cat }
+  });
+
+  // Build today's time summary
+  const todayData = await getTodayFragments();
+  const timeLogs = todayData.filter(f => f.type === 'time_log');
+  const catTotals = {};
+  timeLogs.forEach(tl => {
+    if (tl.timeData) {
+      catTotals[tl.timeData.category] = (catTotals[tl.timeData.category] || 0) + tl.timeData.duration_min;
+    }
+  });
+
+  let summary = '';
+  if (Object.keys(catTotals).length > 1) {
+    const parts = Object.entries(catTotals)
+      .sort((a,b) => b[1]-a[1])
+      .map(([c, m]) => `${c} ${formatDuration(m)}`);
+    summary = '<div class="stats-grid">' + parts.map(p => `<span class="stat-item">${p}</span>`).join('') + '</div>';
+  }
+
+  addMessage(`<div class="label">⏱ 时间记录</div><strong>${cls.activity}</strong> ${durStr}<br><span style="font-size:12px;color:var(--text2)">分类: ${cat}</span>${summary}`, 'time');
+
+  // Auto daily summary if we have more than 5 time logs
+  if (timeLogs.length >= 5 && !todayData.some(f => f.type === 'daily_summary')) {
+    // Don't auto-trigger, just show a subtle hint
+    addMessage('💡 已有 ' + timeLogs.length + ' 条时间记录，发送 "今天总结" 查看汇总', 'system');
+  }
+}
+
+async function processMicro(text) {
+  const type = detectType(text);
+  const mood = detectMood(text);
+  
+  await dbAdd('fragments', {
+    date: today(), time: now(), text, type: 'fragment',
+    detectedType: type, mood: mood
+  });
+
+  let reply = '📝 已记录 ✅';
+  if (type !== '其他') {
+    reply += `<span class="time-tag ${getTagClass(type)}">${type}</span>`;
+  }
+  if (mood) {
+    reply += `<span style="font-size:12px;color:var(--text2);margin-left:4px">→ ${mood}</span>`;
+  }
+  addMessage(reply, 'bot');
+}
+
+async function processMedium(text) {
+  const type = detectType(text);
+  const mood = detectMood(text);
+  
+  await dbAdd('fragments', {
+    date: today(), time: now(), text, type: 'fragment',
+    detectedType: type, mood: mood
+  });
+
+  let reply = '📝 已记录 ✅';
+  if (type !== '其他') {
+    reply += `<span class="time-tag ${getTagClass(type)}">${type}</span>`;
+  }
+  if (mood) {
+    reply += `<br><span style="font-size:12px;color:var(--text2)">→ 核心情绪：${mood}</span>`;
+  }
+  addMessage(reply, 'bot');
+}
+
+function getTagClass(type) {
+  const map = { '情绪': 'tag-emotion', '工作': 'tag-work', '读书': 'tag-read', '习惯': 'tag-habit', '决策': 'tag-decision' };
+  return map[type] || '';
+}
+
+async function processLong(text) {
+  addMessage('🧠 分析中...', 'system');
+  showLoading();
+  
+  try {
+    const result = await callAI([{ role: 'user', content: text }]);
+    hideLoading();
+    // Remove the "分析中" message
+    const msgs = document.querySelectorAll('.msg');
+    for (const m of msgs) {
+      if (m.textContent.includes('分析中')) m.remove();
+    }
+    addMessage('<div class="label">📋 分析</div>' + result.replace(/\n/g, '<br>'), 'bot');
+    
+    await dbAdd('fragments', {
+      date: today(), time: now(), text, type: 'long_analysis',
+      analysis: result
+    });
+  } catch (err) {
+    hideLoading();
+    throw err;
+  }
+}
+
+async function processDailySummary() {
+  addMessage('📅 生成日总结中...', 'system');
+  showLoading();
+  
+  try {
+    const fragments = await getTodayFragments();
+    if (fragments.length === 0) {
+      hideLoading();
+      const m = document.querySelector('.msg:last-child');
+      if (m && m.textContent.includes('生成日总结')) m.remove();
+      addMessage('📅 今天还没有任何记录，发点碎碎念吧', 'bot');
+      return;
+    }
+    
+    // Build context for AI
+    let context = '今天日期：' + today() + '\n\n';
+    context += '=== 碎碎念记录 ===\n';
+    fragments.filter(f => f.type === 'fragment' || f.type === 'long_analysis').forEach(f => {
+      context += f.time + ' ' + f.text + '\n';
+    });
+    context += '\n=== 时间记录 ===\n';
+    fragments.filter(f => f.type === 'time_log').forEach(f => {
+      if (f.timeData) {
+        context += f.timeData.start + '-' + f.timeData.end + ' ' + f.timeData.activity + ' (' + formatDuration(f.timeData.duration_min) + ')\n';
+      }
+    });
+    
+    const result = await callAI([
+      { role: 'user', content: '请生成今天的日总结，包含：今日主题、主要矛盾、一句话建议。如果有时间记录也做时间分布分析。\n\n' + context }
+    ]);
+    hideLoading();
+    const m = document.querySelector('.msg:last-child');
+    if (m && m.textContent.includes('生成日总结')) m.remove();
+    addMessage('<div class="label">📅 日总结</div>' + result.replace(/\n/g, '<br>'), 'bot');
+    
+    await dbAdd('fragments', {
+      date: today(), time: now(), text: '[日总结]', type: 'daily_summary',
+      summary: result
+    });
+  } catch (err) {
+    hideLoading();
+    throw err;
+  }
+}
+
+async function processWeeklyReview() {
+  addMessage('📊 生成周复盘...', 'system');
+  showLoading();
+  
+  try {
+    const fragments = await getWeekFragments();
+    if (fragments.length === 0) {
+      hideLoading();
+      const m = document.querySelector('.msg:last-child');
+      if (m && m.textContent.includes('生成周复盘')) m.remove();
+      addMessage('📊 本周还没有记录', 'bot');
+      return;
+    }
+    
+    let context = '本周：' + today() + ' 往前7天\n\n';
+    context += '=== 本周所有记录 ===\n';
+    fragments.forEach(f => {
+      const prefix = f.timeData ? `[时间] ${f.timeData.start}-${f.timeData.end}` : `[${f.type}]`;
+      context += f.date + ' ' + (f.time || '') + ' ' + prefix + ' ' + f.text + '\n';
+    });
+    
+    const result = await callAI([
+      { role: 'user', content: '请生成本周的周复盘报告。包含：本周核心洞察、信念演变、行动项、矛盾分析、连接3年愿景。\n\n' + context }
+    ]);
+    hideLoading();
+    const m = document.querySelector('.msg:last-child');
+    if (m && m.textContent.includes('生成周复盘')) m.remove();
+    addMessage('<div class="label">📊 周复盘</div>' + result.replace(/\n/g, '<br>'), 'bot');
+    
+    await dbAdd('fragments', {
+      date: today(), time: now(), text: '[周复盘]', type: 'weekly_review',
+      summary: result
+    });
+  } catch (err) {
+    hideLoading();
+    throw err;
+  }
+}
+
+async function processMonthlyReview() {
+  addMessage('📈 生成月复盘...', 'system');
+  showLoading();
+  
+  try {
+    const fragments = await getMonthFragments();
+    if (fragments.length === 0) {
+      hideLoading();
+      const m = document.querySelector('.msg:last-child');
+      if (m && m.textContent.includes('生成月复盘')) m.remove();
+      addMessage('📈 本月还没有记录', 'bot');
+      return;
+    }
+    
+    let context = '本月至今记录共 ' + fragments.length + ' 条\n\n';
+    
+    // Summary stats
+    const types = {};
+    const dailyCount = new Set(fragments.map(f => f.date)).size;
+    fragments.forEach(f => {
+      const t = f.type || 'fragment';
+      types[t] = (types[t] || 0) + 1;
+    });
+    context += '记录天数: ' + dailyCount + '天\n';
+    context += '类型分布: ' + JSON.stringify(types) + '\n\n';
+    context += '=== 本月关键记录 ===\n';
+    fragments.filter(f => f.type === 'long_analysis' || f.type === 'daily_summary').forEach(f => {
+      context += f.date + ' ' + f.text.substring(0, 100) + '\n';
+    });
+    
+    const result = await callAI([
+      { role: 'user', content: '请生成月复盘报告。包含：信念演变轨迹、重复模式识别、时间趋势、知识缺口汇总。\n\n' + context }
+    ]);
+    hideLoading();
+    const m = document.querySelector('.msg:last-child');
+    if (m && m.textContent.includes('生成月复盘')) m.remove();
+    addMessage('<div class="label">📈 月复盘</div>' + result.replace(/\n/g, '<br>'), 'bot');
+    
+    await dbAdd('fragments', {
+      date: today(), time: now(), text: '[月复盘]', type: 'monthly_review',
+      summary: result
+    });
+  } catch (err) {
+    hideLoading();
+    throw err;
+  }
+}
+
+async function showHistory() {
+  const fragments = await getTodayFragments();
+  if (fragments.length === 0) {
+    addMessage('📋 今天还没有记录', 'bot');
+    return;
+  }
+  
+  let html = '<div class="label">📋 今日记录 (' + fragments.length + '条)</div>';
+  fragments.slice(-20).forEach(f => {
+    const icon = f.type === 'time_log' ? '⏱' : f.type === 'daily_summary' ? '📅' : f.type === 'weekly_review' ? '📊' : '💬';
+    html += '<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #ffffff08">';
+    html += '<span style="color:var(--text2);font-size:11px">' + f.time + '</span> ';
+    html += '<span>' + icon + '</span> ';
+    html += f.text.substring(0, 80) + (f.text.length > 80 ? '...' : '');
+    html += '</div>';
+  });
+  addMessage(html, 'bot');
+}
+
+function quickAction(cmd) {
+  document.getElementById('input').value = cmd;
+  sendMessage();
+}
+
+function viewHistory() {
+  showHistory();
+}
+
+// ==================== Settings ====================
+async function openSettings() {
+  const settings = await getSettings();
+  if (settings.provider) {
+    document.getElementById('apiProvider').value = settings.provider;
+  }
+  if (settings.model) document.getElementById('modelName').value = settings.model;
+  if (settings.endpoint) document.getElementById('apiEndpoint').value = settings.endpoint;
+  if (settings.key) document.getElementById('apiKey').value = settings.key;
+  if (settings.systemPrompt) document.getElementById('systemPrompt').value = settings.systemPrompt;
+  document.getElementById('settingsModal').classList.add('show');
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('show');
+}
+
+async function saveSettings() {
+  const data = {
+    provider: document.getElementById('apiProvider').value,
+    model: document.getElementById('modelName').value,
+    endpoint: document.getElementById('apiEndpoint').value,
+    key: document.getElementById('apiKey').value,
+    systemPrompt: document.getElementById('systemPrompt').value
+  };
+  
+  if (!data.key) {
+    alert('请输入 API Key');
+    return;
+  }
+  if (!data.endpoint) {
+    alert('请输入 API Endpoint');
+    return;
+  }
+  if (!data.model) {
+    alert('请输入模型名称');
+    return;
+  }
+  
+  await saveSettingsToDB(data);
+  closeSettings();
+  updateStatus(true);
+  addMessage('✅ 设置已保存。模型：' + data.model, 'system');
+}
+
+
+// ==================== Service Worker ====================
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+// ==================== Init ====================
+async function init() {
+  await openDB();
+  const settings = await getSettings();
+  updateStatus(!!settings.key);
+  
+  // Auto resize textarea
+  const textarea = document.getElementById('input');
+  textarea.addEventListener('input', () => {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+  });
+  
+  // Enter to send (Shift+Enter for newline)
+  textarea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+  
+  // Close modal on overlay click
+  document.getElementById('settingsModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeSettings();
+  });
+}
+
+init();
+</script>
+</body>
+</html>
+
+
