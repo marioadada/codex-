@@ -114,6 +114,21 @@ header h1 span { color: var(--accent); }
 /* Stats in time records */
 .stats-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .stat-item { background: #ffffff08; padding: 4px 10px; border-radius: 8px; font-size: 12px; }
+/* Markdown rendering */
+.msg.bot h3, .msg.bot h4 { margin: 10px 0 4px; color: var(--accent); font-weight: 600; }
+.msg.bot h3 { font-size: 15px; }
+.msg.bot h4 { font-size: 14px; }
+.msg.bot p { margin: 4px 0; }
+.msg.bot ul, .msg.bot ol { margin: 4px 0; padding-left: 20px; }
+.msg.bot li { margin: 2px 0; }
+.msg.bot strong { color: #fff; font-weight: 600; }
+.msg.bot em { font-style: italic; color: var(--text2); }
+.msg.bot code { background: #ffffff15; padding: 1px 6px; border-radius: 4px; font-size: 13px; font-family: 'Cascadia Code', 'Fira Code', monospace; }
+.msg.bot pre { background: #0d0d1a; padding: 10px 12px; border-radius: 8px; overflow-x: auto; margin: 6px 0; }
+.msg.bot pre code { background: none; padding: 0; border-radius: 0; }
+.msg.bot blockquote { border-left: 3px solid var(--accent); padding-left: 12px; margin: 6px 0; color: var(--text2); }
+.msg.bot hr { border: none; border-top: 1px solid #ffffff15; margin: 8px 0; }
+.msg.bot a { color: #64b5f6; text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -281,13 +296,60 @@ function addMessage(content, type = 'bot') {
   const div = document.createElement('div');
   div.className = 'msg ' + type;
   if (type === 'bot' || type === 'time') {
-    div.innerHTML = content;
+    div.innerHTML = type === 'bot' ? renderMarkdown(content) : content;
   } else if (type === 'user') {
     div.textContent = content;
   }
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
   return div;
+}
+
+function renderMarkdown(text) {
+  text = text.replace(/```(\w*)\n?([\s\S]*?)```/g, function(_, lang, code) {
+    return '<pre><code>' + code.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</code></pre>';
+  });
+  var lines = text.split('\n');
+  var out = [];
+  var inUL = false, inOL = false;
+  function closeList() {
+    if (inUL) { out.push('</ul>'); inUL = false; }
+    if (inOL) { out.push('</ol>'); inOL = false; }
+  }
+  function inline(s) {
+    return s
+      .replace(/\*\*\*(.+?)\*\*\*/g, '<em><strong>$1</strong></em>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  }
+  for (var i = 0; i < lines.length; i++) {
+    var raw = lines[i];
+    var t = raw.trim();
+    if (/^### /.test(t))          { closeList(); out.push('<h4>'+inline(t.slice(4))+'</h4>'); }
+    else if (/^## /.test(t))      { closeList(); out.push('<h3>'+inline(t.slice(3))+'</h3>'); }
+    else if (/^---$/.test(t))     { closeList(); out.push('<hr>'); }
+    else if (/^> /.test(t))       { closeList(); out.push('<blockquote>'+inline(t.slice(2))+'</blockquote>'); }
+    else if (/^[-*] /.test(t) && t.length>2) {
+      if (inOL) { out.push('</ol>'); inOL = false; }
+      if (!inUL) { out.push('<ul>'); inUL = true; }
+      out.push('<li>'+inline(t.slice(2))+'</li>');
+    }
+    else if (/^\d+\.\s/.test(t)) {
+      if (inUL) { out.push('</ul>'); inUL = false; }
+      if (!inOL) { out.push('<ol>'); inOL = true; }
+      out.push('<li>'+inline(t.replace(/^\d+\.\s/,''))+'</li>');
+    }
+    else {
+      closeList();
+      if (t === '') out.push('<br>');
+      else if (/^<\//.test(t) || /^<[a-z]+[\s>]/.test(t)) out.push(inline(raw));
+      else out.push('<p>'+inline(raw)+'</p>');
+    }
+  }
+  closeList();
+  return out.join('\n');
 }
 
 function removeWelcome() {

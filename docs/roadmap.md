@@ -67,3 +67,4 @@
 - **决策**: 使用 OpenAI Chat Completions API 格式接入多家 AI
 - **理由**: DeepSeek / 千问 / 豆包 都兼容此格式，切换成本最低
 - **权衡**: 各家模型能力有差异，部分高级功能（如 function calling）可能不通用
+
