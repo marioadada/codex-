@@ -345,6 +345,7 @@ function renderMarkdown(text) {
       closeList();
       if (t === '') out.push('<br>');
       else if (/^<\//.test(t) || /^<[a-z]+[\s>]/.test(t)) out.push(inline(raw));
+      else if (raw.length < 60 && !/^[#>*\-\d]/.test(t)) out.push(inline(raw));
       else out.push('<p>'+inline(raw)+'</p>');
     }
   }
@@ -743,7 +744,7 @@ async function processLong(text) {
     for (const m of msgs) {
       if (m.textContent.includes('分析中')) m.remove();
     }
-    addMessage('<div class="label">📋 分析</div>' + result.replace(/\n/g, '<br>'), 'bot');
+    addMessage('<div class="label">📋 分析</div>\n' + result, 'bot');
     
     await dbAdd('fragments', {
       date: today(), time: now(), text, type: 'long_analysis',
@@ -788,7 +789,7 @@ async function processDailySummary() {
     hideLoading();
     const m = document.querySelector('.msg:last-child');
     if (m && m.textContent.includes('生成日总结')) m.remove();
-    addMessage('<div class="label">📅 日总结</div>' + result.replace(/\n/g, '<br>'), 'bot');
+    addMessage('<div class="label">📅 日总结</div>\n' + result, 'bot');
     
     await dbAdd('fragments', {
       date: today(), time: now(), text: '[日总结]', type: 'daily_summary',
@@ -827,7 +828,7 @@ async function processWeeklyReview() {
     hideLoading();
     const m = document.querySelector('.msg:last-child');
     if (m && m.textContent.includes('生成周复盘')) m.remove();
-    addMessage('<div class="label">📊 周复盘</div>' + result.replace(/\n/g, '<br>'), 'bot');
+    addMessage('<div class="label">📊 周复盘</div>\n' + result, 'bot');
     
     await dbAdd('fragments', {
       date: today(), time: now(), text: '[周复盘]', type: 'weekly_review',
@@ -875,7 +876,7 @@ async function processMonthlyReview() {
     hideLoading();
     const m = document.querySelector('.msg:last-child');
     if (m && m.textContent.includes('生成月复盘')) m.remove();
-    addMessage('<div class="label">📈 月复盘</div>' + result.replace(/\n/g, '<br>'), 'bot');
+    addMessage('<div class="label">📈 月复盘</div>\n' + result, 'bot');
     
     await dbAdd('fragments', {
       date: today(), time: now(), text: '[月复盘]', type: 'monthly_review',
@@ -989,6 +990,50 @@ async function init() {
     }
   });
   
+  // Load history from IndexedDB
+  try {
+    const fragments = await dbGetAll('fragments');
+    if (fragments && fragments.length > 0) {
+      removeWelcome();
+      fragments.sort((a, b) => a.id - b.id);
+      // Show last 50 fragments
+      const recent = fragments.slice(-50);
+      for (const f of recent) {
+        // Show user message
+        if (f.text && f.type !== 'daily_summary' && f.type !== 'weekly_review' && f.type !== 'monthly_review') {
+          addMessage(f.text, 'user');
+        }
+        // Show bot response
+        if (f.type === 'time_log' && f.timeData) {
+          const d = f.timeData;
+          const h = Math.floor(d.duration_min/60);
+          const m = d.duration_min%60;
+          const durStr = h>0 ? h+'h'+m+'m' : m+'min';
+          let summary = '';
+          const stats = {};
+          fragments.filter(x=>x.timeData).forEach(x=>{
+            const c = x.timeData.category || 'other';
+            stats[c] = (stats[c]||0) + x.timeData.duration_min;
+          });
+          const parts = Object.entries(stats).map(([k,v])=>{
+            const hh=Math.floor(v/60), mm=v%60;
+            return '<span class=\"stat-item\">'+k+' '+(hh>0?hh+'h':'')+mm+'min</span>';
+          }).join('');
+          if (parts) summary = '<div class=\"stats-grid\">'+parts+'</div>';
+          addMessage('<div class=\"label\">⏱ 时间记录</div><strong>'+d.activity+'</strong> '+durStr+'<br><span style=\"font-size:12px;color:var(--text2)\">分类: '+d.category+'</span>'+summary, 'time');
+        } else if (f.analysis) {
+          addMessage('<div class=\"label\">📋 分析</div>'+f.analysis, 'bot');
+        } else if (f.summary) {
+          const label = f.type==='daily_summary'?'📅 日总结':f.type==='weekly_review'?'📊 周复盘':'📈 月复盘';
+          addMessage('<div class=\"label\">'+label+'</div>'+f.summary, 'bot');
+        } else if (f.type === 'fragment' && f.mood) {
+          const tagClass = ({'😢':'tag-emotion','💼':'tag-work','📚':'tag-read','🔄':'tag-habit','💡':'tag-decision'})[f.mood]||'';
+          addMessage('<span class=\"tag '+tagClass+'\">'+f.mood+'</span> 已记录', 'bot');
+        }
+      }
+    }
+  } catch(e) { console.error('Load history error:', e); }
+
   // Close modal on overlay click
   document.getElementById('settingsModal').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeSettings();
