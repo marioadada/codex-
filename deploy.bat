@@ -9,7 +9,7 @@ echo 2. 知道你的 GitHub 用户名
 echo.
 
 set /p GH_USER=请输入你的 GitHub 用户名: 
-set REPO_NAME=fragment-tracker
+set REPO_NAME=codex-
 
 echo.
 echo 第一步：在 GitHub 上创建仓库...
@@ -38,3 +38,4 @@ if %ERRORLEVEL% EQU 0 (
 )
 
 pause
+
